@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบออกใบรับรองแทนใบเสร็จรับเงิน</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Sarabun', 'TH Sarabun PSK', sans-serif;
+        }
+        body {
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .section-title {
+            font-size: 15px;
+            font-weight: bold;
+            color: #1e3a8a;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 5px;
+            margin-top: 20px;
+            margin-bottom: 12px;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            font-weight: bold;
+            margin-bottom: 3px;
+            font-size: 13px;
+            color: #4b5563;
+        }
+        input, textarea {
+            padding: 8px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+        th, td {
+            border: 1px solid #cbd5e1;
+            padding: 6px 10px;
+            text-align: left;
+            font-size: 14px;
+        }
+        th {
+            background-color: #f1f5f9;
+            text-align: center;
+        }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        .btn-add { background-color: #10b981; color: white; margin-bottom: 10px; }
+        .btn-add:hover { background-color: #059669; }
+        .btn-del { background-color: #ef4444; color: white; padding: 2px 6px; font-size: 11px; }
+        .btn-print { background-color: #2563eb; color: white; font-size: 16px; width: 100%; padding: 12px; margin-top: 25px; }
+        .btn-print:hover { background-color: #1d4ed8; }
+        
+        .slip-ref-box {
+            margin-top: 10px;
+            padding: 8px 10px;
+            border: 1px dashed #9ca3af;
+            border-radius: 6px;
+            background-color: #f9fafb;
+            font-size: 13px;
+        }
+        .cert-text {
+            margin-top: 15px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* ซ่อนหัวข้อบนเว็บตอนพิมพ์ และบังคับไม่ให้มี Header/Footer นอกเหนือจากเนื้อหา */
+        .print-only-title {
+            display: none;
+        }
+
+        @media print {
+            @page {
+                size: A4;
+                margin: 5mm; /* ตั้งขอบกระดาษชิดเพื่อดันวันที่และลิงก์ไฟล์ของเบราว์เซอร์ให้ออกนอกพื้นที่กระดาษพิมพ์ */
+            }
+            body { 
+                background: white; 
+                padding: 0; 
+                margin: 0;
+            }
+            .container { 
+                box-shadow: none; 
+                padding: 5mm; 
+                width: 100%; 
+                max-width: 100%; 
+            }
+            .no-print { display: none !important; }
+            
+            input.editable-input {
+                border: none;
+                background: transparent;
+                padding: 0;
+                font-size: 14px;
+                text-align: center;
+                width: 100%;
+            }
+            th, td { border: 1px solid #000; padding: 5px; }
+            .print-only-title {
+                text-align: center;
+                font-size: 22px;
+                font-weight: bold;
+                margin-bottom: 15px;
+                display: block !important;
+            }
+            .slip-ref-box { border: 1px solid #000; background: transparent; }
+            
+            .sign-section {
+                display: flex;
+                justify-content: space-between;
+                margin-top: 35px;
+                text-align: center;
+            }
+            .sign-box { width: 45%; }
+            .sign-line { 
+                border-bottom: 1px dotted #000; 
+                width: 80%; 
+                margin-left: auto; 
+                margin-right: auto; 
+                height: 35px;
+            }
+        }
+
+        /* หน้าจอปกติ */
+        .sign-section {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+            text-align: center;
+        }
+        .sign-box { width: 45%; }
+        .sign-line { 
+            border-bottom: 1px dotted #000; 
+            width: 80%; 
+            margin-left: auto; 
+            margin-right: auto; 
+            height: 35px;
+        }
+        .editable-input {
+            width: 100%;
+            padding: 2px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            text-align: center;
+            background: #fff;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- หัวข้อเฉพาะตอนพิมพ์ -->
+    <div class="print-only-title">ใบรับรองแทนใบเสร็จรับเงิน</div>
+    
+    <!-- หัวข้อบนหน้าเว็บปกติ -->
+    <div style="text-align: center; font-size: 22px; font-weight: bold; margin-bottom: 20px;" class="no-print">ใบรับรองแทนใบเสร็จรับเงิน</div>
+
+    <!-- ข้อมูลส่วนหัว -->
+    <div class="section-title">1. ข้อมูลทั่วไป</div>
+    <div class="form-grid">
+        <div class="form-group">
+            <label>ชื่อสถานประกอบการ / ผู้เบิก:</label>
+            <input type="text" id="shopName" value="ร้านโชว์ห่วย (นายสมชาย ใจดี)">
+        </div>
+        <div class="form-group">
+            <label>วันที่จ่ายเงิน:</label>
+            <input type="text" id="payDate" value="7 มิถุนายน 2569">
+        </div>
+        <div class="form-group">
+            <label>ชื่อผู้รับเงิน / ร้านค้าส่ง:</label>
+            <input type="text" id="sellerName" value="บิลมือ (นายวิชัย ค้าส่ง)">
+        </div>
+        <div class="form-group">
+            <label>สถานที่ซื้อ:</label>
+            <input type="text" id="buyLocation" value="ตลาดค้าส่งสินค้าอุปโภคบริโภค">
+        </div>
+    </div>
+
+    <!-- ตารางรายการสินค้า -->
+    <div class="section-title">2. รายการสินค้า</div>
+    <table id="itemTable">
+        <thead>
+            <tr>
+                <th style="width: 8%;" class="text-center">ลำดับ</th>
+                <th style="width: 45%;">รายการสินค้า</th>
+                <th style="width: 15%;" class="text-center">จำนวน</th>
+                <th style="width: 15%;" class="text-right">ราคา/หน่วย</th>
+                <th style="width: 17%;" class="text-right">จำนวนเงิน (บาท)</th>
+                <th class="no-print" style="width: 5%;"></th>
+            </tr>
+        </thead>
+        <tbody id="itemRows"></tbody>
+        <tfoot>
+            <tr>
+                <td colspan="4" class="text-right"><strong>รวมทั้งสิ้น (ตัวอักษร):</strong> <span id="textTotal">(-ศูนย์บาทถ้วน-)</span></td>
+                <td class="text-right"><strong id="grandTotal">0.00</strong></td>
+                <td class="no-print"></td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <button class="btn btn-add no-print" onclick="addRow()">+ เพิ่มรายการสินค้า</button>
+
+    <!-- ข้อมูลสลิปโอนเงินอ้างอิง -->
+    <div class="section-title">3. ข้อมูลหลักฐานการโอนเงิน (E-Slip อ้างอิง)</div>
+    <div class="form-grid">
+        <div class="form-group">
+            <label>ธนาคาร (ผู้โอน / ผู้รับ):</label>
+            <input type="text" id="slipBank" value="ธ.กสิกรไทย ไปยัง ธ.ไทยพาณิชย์">
+        </div>
+        <div class="form-group">
+            <label>วันที่และเวลาบนสลิป:</label>
+            <input type="text" id="slipDateTime" value="7 มิ.ย. 2569 | 10:30 น.">
+        </div>
+        <div class="form-group">
+            <label>ยอดเงินบนสลิป (บาท):</label>
+            <input type="text" id="slipAmount" value="490.00">
+        </div>
+        <div class="form-group">
+            <label>เลขที่อ้างอิงสลิป (Transaction Ref):</label>
+            <input type="text" id="slipRef" value="202606078942150">
+        </div>
+    </div>
+
+    <div class="slip-ref-box">
+        <strong>หลักฐานการชำระเงินอ้างอิง:</strong> โอนผ่านธนาคาร <span id="printBank">ธ.กสิกรไทย ไปยัง ธ.ไทยพาณิชย์</span> | วันเวลา: <span id="printDateTime">7 มิ.ย. 2569 | 10:30 น.</span> | ยอดเงิน: <span id="printAmount">490.00</span> บาท | <strong>Ref:</strong> <span id="printRef">202606078942150</span>
+    </div>
+
+    <!-- ข้อความคำรับรอง -->
+    <div class="cert-text">
+        <p><strong>คำรับรอง:</strong> ข้าพเจ้าขอรับรองว่า รายจ่ายข้างต้นนี้ไม่อาจเรียกเก็บใบเสร็จรับเงินจากผู้รับเงินได้ และข้าพเจ้าได้จ่ายเงินไปในงานของกิจการร้านค้าโดยแท้จริง เพื่อนำมาใช้ในการดำเนินงานของ <span id="shopNameDisplay">ร้านโชว์ห่วย</span></p>
+    </div>
+
+    <!-- ลายเซ็น -->
+    <div class="sign-section">
+        <div class="sign-box">
+            <div class="sign-line"></div>
+            <p style="margin: 4px 0 0 0; font-size: 14px;">
+                ( <input type="text" id="signer1" value="นายสมชาย ใจดี" class="editable-input" style="display:inline-block; width:70%;"> )<br>
+                <strong>ผู้ขอเบิก / เจ้าของร้าน</strong><br>
+                วันที่ <span id="signDate1">7 มิถุนายน 2569</span>
+            </p>
+        </div>
+        <div class="sign-box">
+            <div class="sign-line"></div>
+            <p style="margin: 4px 0 0 0; font-size: 14px;">
+                ( <input type="text" id="signer2" value="นางสาวนภา มีสุข" class="editable-input" style="display:inline-block; width:70%;"> )<br>
+                <strong>ผู้ตรวจสอบ / บัญชี</strong><br>
+                วันที่ <span id="signDate2">7 มิถุนายน 2569</span>
+            </p>
+        </div>
+    </div>
+
+    <button class="btn btn-print no-print" onclick="window.print()">🖨️ พิมพ์เอกสาร / บันทึกเป็น PDF</button>
+</div>
+
+<script>
+    const initialData = [
+        { name: "เป๊ปซี่ 19.-", qty: "1 โหล", price: 200 },
+        { name: "คาลาไมน์ 10.-", qty: "1 ลัง", price: 100 },
+        { name: "ผงซักฟอก 15.-", qty: "1 โหล", price: 190 }
+    ];
+
+    function init() {
+        initialData.forEach(item => addRow(item.name, item.qty, item.price));
+        updateShopDisplay();
+        updateSlipDisplay();
+    }
+
+    function addRow(name = "", qty = "1", price = 0) {
+        const tbody = document.getElementById('itemRows');
+        const rowCount = tbody.rows.length + 1;
+        const tr = document.createElement('tr');
+
+        tr.innerHTML = `
+            <td class="text-center row-num">${rowCount}</td>
+            <td><input type="text" class="item-name" value="${name}" placeholder="ชื่อสินค้า"></td>
+            <td class="text-center"><input type="text" class="item-qty text-center" value="${qty}"></td>
+            <td class="text-right"><input type="number" class="item-price text-right" value="${price}" oninput="calculateTotal()"></td>
+            <td class="text-right item-total">${(price).toFixed(2)}</td>
+            <td class="no-print text-center"><button class="btn btn-del" onclick="delRow(this)">X</button></td>
+        `;
+        tbody.appendChild(tr);
+        calculateTotal();
+    }
+
+    function delRow(btn) {
+        const row = btn.parentNode.parentNode;
+        row.parentNode.removeChild(row);
+        updateRowNumbers();
+        calculateTotal();
+    }
+
+    function updateRowNumbers() {
+        const rows = document.querySelectorAll('#itemRows tr');
+        rows.forEach((row, index) => {
+            row.querySelector('.row-num').innerText = index + 1;
+        });
+    }
+
+    function calculateTotal() {
+        let grandTotal = 0;
+        const rows = document.querySelectorAll('#itemRows tr');
+
+        rows.forEach(row => {
+            const price = parseFloat(row.querySelector('.item-price').value) || 0;
+            row.querySelector('.item-total').innerText = price.toFixed(2);
+            grandTotal += price;
+        });
+
+        const formattedTotal = grandTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('grandTotal').innerText = formattedTotal;
+        document.getElementById('textTotal').innerText = `(-${ArabicToThaiBaht(grandTotal)}-)`;
+        
+        document.getElementById('slipAmount').value = formattedTotal;
+        updateSlipDisplay();
+    }
+
+    document.getElementById('shopName').addEventListener('input', updateShopDisplay);
+    document.getElementById('payDate').addEventListener('input', function() {
+        document.getElementById('signDate1').innerText = this.value;
+        document.getElementById('signDate2').innerText = this.value;
+    });
+
+    document.getElementById('slipBank').addEventListener('input', updateSlipDisplay);
+    document.getElementById('slipDateTime').addEventListener('input', updateSlipDisplay);
+    document.getElementById('slipAmount').addEventListener('input', updateSlipDisplay);
+    document.getElementById('slipRef').addEventListener('input', updateSlipDisplay);
+
+    function updateShopDisplay() {
+        document.getElementById('shopNameDisplay').innerText = document.getElementById('shopName').value;
+    }
+
+    function updateSlipDisplay() {
+        document.getElementById('printBank').innerText = document.getElementById('slipBank').value;
+        document.getElementById('printDateTime').innerText = document.getElementById('slipDateTime').value;
+        document.getElementById('printAmount').innerText = document.getElementById('slipAmount').value;
+        document.getElementById('printRef').innerText = document.getElementById('slipRef').value;
+    }
+
+    function ArabicToThaiBaht(numbers) {
+        var numberArray = ["ศูนย์", "หนึ่ง", "สอง", "สาม", "สี่", "ห้า", "หก", "เจ็ด", "แปด", "เก้า"];
+        var unitArray = ["", "สิบ", "ร้อย", "พัน", "หมื่น", "แสน", "ล้าน"];
+        var splitNumber = numbers.toFixed(2).split(".");
+        var baht = splitNumber[0];
+        var satang = splitNumber[1];
+        var bahtText = "";
+
+        if (parseFloat(numbers) === 0) return "ศูนย์บาทถ้วน";
+
+        for (var i = 0; i < baht.length; i++) {
+            var number = baht.charAt(i);
+            var unit = unitArray[baht.length - i - 1];
+            if (number !== "0") {
+                if (i === baht.length - 1 && number === "1" && baht.length > 1) {
+                    bahtText += "เอ็ด";
+                } else if (i === baht.length - 2 && number === "2") {
+                    bahtText += "ยี่สิบ";
+                } else if (i === baht.length - 2 && number === "1") {
+                    bahtText += "สิบ";
+                } else {
+                    bahtText += numberArray[number] + unit;
+                }
+            }
+        }
+        bahtText += "บาท";
+
+        if (satang === "00") {
+            bahtText += "ถ้วน";
+        } else {
+            for (var i = 0; i < satang.length; i++) {
+                var number = satang.charAt(i);
+                var unit = unitArray[satang.length - i - 1];
+                if (number !== "0") {
+                    if (i === satang.length - 1 && number === "1") {
+                        bahtText += "เอ็ด";
+                    } else if (i === satang.length - 2 && number === "2") {
+                        bahtText += "ยี่สิบ";
+                    } else if (i === satang.length - 2 && number === "1") {
+                        bahtText += "สิบ";
+                    } else {
+                        bahtText += numberArray[number] + unit;
+                    }
+                }
+            }
+            bahtText += "สตางค์";
+        }
+        return bahtText;
+    }
+
+    window.onload = init;
+</script>
+
+</body>
+</html>
